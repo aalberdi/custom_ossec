@@ -26,7 +26,7 @@ int Read_Syscheck_Config(const char *cfgfile)
     syscheck.disabled       = 0;
     syscheck.skip_nfs       = 0;
     syscheck.scan_on_start  = 1;
-    syscheck.time           = 21600;
+    syscheck.time           = SYSCHECK_WAIT * 2;
     syscheck.ignore         = NULL;
     syscheck.ignore_regex   = NULL;
     syscheck.scan_day       = NULL;

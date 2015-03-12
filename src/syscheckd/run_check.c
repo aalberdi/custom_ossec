@@ -213,7 +213,7 @@ void start_daemon()
         }
     }
 
-    /* Check every syscheck.wait */
+    /* Check every SYSCHECK_WAIT */
     while (1) {
         int run_now = 0;
         curr_time = time(0);
@@ -289,12 +289,13 @@ void start_daemon()
 #endif
                 /* Check for changes */
                 run_dbcheck();
-				/* Send scan ending message */
-				sleep(syscheck.tsleep + 20);
-				if (syscheck.dir[0]) {
-					merror("%s: INFO: Ending syscheck scan.", ARGV0);
-					send_rootcheck_msg("Ending syscheck scan.");
-				}
+		/* Send scan ending message */
+		sleep(syscheck.tsleep + 20);
+		if (syscheck.dir[0]) {
+			merror("%s: INFO: Ending syscheck scan.", ARGV0);
+			send_rootcheck_msg("Ending syscheck scan.");
+			OSHash_ForEach(syscheck.fp, (OSHash_Function) &check_if_deleted);
+		}
             }
 
             prev_time_sk = time(0);
@@ -302,7 +303,7 @@ void start_daemon()
 
 #ifdef INOTIFY_ENABLED
         if (syscheck.realtime && (syscheck.realtime->fd >= 0)) {
-            selecttime.tv_sec = syscheck.wait;
+            selecttime.tv_sec = SYSCHECK_WAIT;
             selecttime.tv_usec = 0;
 
             /* zero-out the fd_set */
@@ -313,28 +314,28 @@ void start_daemon()
                              NULL, NULL, &selecttime);
             if (run_now < 0) {
                 merror("%s: ERROR: Select failed (for realtime fim).", ARGV0);
-                sleep(syscheck.wait);
+                sleep(SYSCHECK_WAIT);
             } else if (run_now == 0) {
                 /* Timeout */
             } else if (FD_ISSET (syscheck.realtime->fd, &rfds)) {
                 realtime_process();
             }
         } else {
-            sleep(syscheck.wait);
+            sleep(SYSCHECK_WAIT);
         }
 #elif defined(WIN32)
         if (syscheck.realtime && (syscheck.realtime->fd >= 0)) {
-            if (WaitForSingleObjectEx(syscheck.realtime->evt, syscheck.wait * 1000, TRUE) == WAIT_FAILED) {
+            if (WaitForSingleObjectEx(syscheck.realtime->evt, SYSCHECK_WAIT * 1000, TRUE) == WAIT_FAILED) {
                 merror("%s: ERROR: WaitForSingleObjectEx failed (for realtime fim).", ARGV0);
-                sleep(syscheck.wait);
+                sleep(SYSCHECK_WAIT);
             } else {
                 sleep(1);
             }
         } else {
-            sleep(syscheck.wait);
+            sleep(SYSCHECK_WAIT);
         }
 #else
-        sleep(syscheck.wait);
+        sleep(SYSCHECK_WAIT);
 #endif
     }
 }
@@ -342,48 +343,43 @@ void start_daemon()
 /* Read file information and return a pointer to the checksum */
 int c_read_file(const char *file_name, const char *oldsum, char *newsum)
 {
-    struct stat statbuf;
-    os_md5 mf_sum;
-    os_sha1 sf_sum;
+	struct stat statbuf;
+	os_md5 mf_sum;
+	os_sha1 sf_sum;
 	int md5sum = (oldsum[4] == '+');
 	int sha1sum = (oldsum[5] == '+') || (oldsum[5] == 's');
 
-    /* Clean sums */
-    strncpy(mf_sum, "xxx", 4);
-    strncpy(sf_sum, "xxx", 4);
+	/* Clean sums */
+	strncpy(mf_sum, "xxx", 4);
+	strncpy(sf_sum, "xxx", 4);
 
-    /* Stat the file */
-#ifdef WIN32
-    if (stat(file_name, &statbuf) < 0)
-#else
-    if (lstat(file_name, &statbuf) < 0)
-#endif
-    {
-        send_syscheck_deletion_msg(file_name);
+	/* Stat the file */
+	if (stat(file_name, &statbuf) < 0)
+	{
+		send_syscheck_deletion_msg(file_name);
+		return (-1);
+	}
 
-        return (-1);
-    }
 
-    
-    /* Generate new checksum */
-    if (S_ISREG(statbuf.st_mode))
-    {
-        if (sha1sum && md5sum)
+	/* Generate new checksum */
+	if (S_ISREG(statbuf.st_mode))
+	{
+		if (sha1sum && md5sum)
 			OS_MD5_SHA1_File((char *)file_name, syscheck.prefilter_cmd, mf_sum, sf_sum);
 		else if (sha1sum)
 			OS_SHA1_File_Prefilter((char *)file_name, syscheck.prefilter_cmd, sf_sum);
 		else if (md5sum)
 			OS_MD5_File_Prefilter((char *)file_name, syscheck.prefilter_cmd, mf_sum);
-    }
+	}
 #ifndef WIN32
-    /* If it is a link, check if the actual file is valid */
-    else if (S_ISDIR(statbuf.st_mode)) {
-        strncpy(mf_sum, "ddd", 4);
+	/* If it is a link, check if the actual file is valid */
+	else if (S_ISDIR(statbuf.st_mode)) {
+		strncpy(mf_sum, "ddd", 4);
 		strncpy(sf_sum, "ddd", 4);
-    }
+	}
 #endif
 
-    snprintf(newsum, 256, "%ld:%d:%d:%d:%s:%s",
+	snprintf(newsum, 256, "%ld:%d:%d:%d:%s:%s",
 		oldsum[0] == '+' ? (long)statbuf.st_size : 0,
 		oldsum[1] == '+' ? (int)statbuf.st_mode : 0,
 		oldsum[2] == '+' ? (int)statbuf.st_uid : 0,
@@ -391,6 +387,6 @@ int c_read_file(const char *file_name, const char *oldsum, char *newsum)
 		mf_sum,
 		sf_sum);
 
-    return (0);
+	return (0);
 }
 

@@ -50,12 +50,18 @@ static int read_file(const char *file_name, int opts, OSMatch *restriction)
 	}
 
 #ifdef WIN32
-/* Win32 does not have lstat */
+	/* Win32 does not have lstat */
 	if (stat(file_name, &statbuf) < 0)
 #else
 	if (lstat(file_name, &statbuf) < 0)
 #endif
 	{
+		if(errno == ENOTDIR){
+			/*Deletion message sending*/
+			if (c_read_file(file_name, 0, 0) < 0) {
+				return (0);
+			}
+		}
 		merror("%s: Error accessing '%s'.", ARGV0, file_name);
 		return (-1);
 	}
@@ -175,74 +181,71 @@ static int read_file(const char *file_name, int opts, OSMatch *restriction)
 
 static int read_dir(const char *dir_name, int opts, OSMatch *restriction)
 {
-    size_t dir_size;
+	size_t dir_size;
 	dbrecord *record = NULL;
-    char f_name[PATH_MAX + 2];
-    short is_nfs;
+	char f_name[PATH_MAX + 2];
+	short is_nfs;
 
-    DIR *dp;
+	DIR *dp;
 	struct stat statbuf;
-    struct dirent *entry;
-	
+	struct dirent *entry;
+
 	char alert_msg[OS_MAXSTR];
 	char c_sum[256];
 	f_name[PATH_MAX +1] = '\0';
-    /* Directory should be valid */
-    if ((dir_name == NULL) || ((dir_size = strlen(dir_name)) > PATH_MAX)) {
-        merror(NULL_ERROR, ARGV0);
-        return (-1);
-    }
+	/* Directory should be valid */
+	if ((dir_name == NULL) || ((dir_size = strlen(dir_name)) > PATH_MAX)) {
+		merror(NULL_ERROR, ARGV0);
+		return (-1);
+	}
 
-    /* Should we check for NFS? */
-    if(syscheck.skip_nfs)
-    {
-        is_nfs = IsNFS(dir_name);
-        if(is_nfs != 0)
-        {
-            // Error will be -1, and 1 means skipped
-            return(is_nfs);
-        }
-    }
+	/* Should we check for NFS? */
+	if(syscheck.skip_nfs)
+	{
+		is_nfs = IsNFS(dir_name);
+		if(is_nfs != 0)
+		{
+			// Error will be -1, and 1 means skipped
+			return(is_nfs);
+		}
+	}
 
-    /* Open the directory given */
-    dp = opendir(dir_name);
-    if (!dp) {
-        if (errno == ENOTDIR) {
-            if (read_file(dir_name, opts, restriction) == 0) {
-                return (0);
-            }
-        }
-
+	/* Open the directory given */
+	dp = opendir(dir_name);
+	if (!dp) {
+		if (read_file(dir_name, opts, restriction) == 0) {
+			return (0);
+		}
 #ifdef WIN32
-        int di = 0;
-        char *(defaultfilesn[]) = {
-            "C:\\autoexec.bat",
-            "C:\\config.sys",
-            "C:\\WINDOWS/System32/eventcreate.exe",
-            "C:\\WINDOWS/System32/eventtriggers.exe",
-            "C:\\WINDOWS/System32/tlntsvr.exe",
-            "C:\\WINDOWS/System32/Tasks",
-            NULL
-        };
-        while (defaultfilesn[di] != NULL) {
-            if (strcmp(defaultfilesn[di], dir_name) == 0) {
-                break;
-            }
-            di++;
-        }
+		int di = 0;
+		char *(defaultfilesn[]) = {
+			"C:\\autoexec.bat",
+			"C:\\config.sys",
+			"C:\\WINDOWS/System32/eventcreate.exe",
+			"C:\\WINDOWS/System32/eventtriggers.exe",
+			"C:\\WINDOWS/System32/tlntsvr.exe",
+			"C:\\WINDOWS/System32/Tasks",
+			NULL
+			};
+		while (defaultfilesn[di] != NULL) {
+			if (strcmp(defaultfilesn[di], dir_name) == 0) {
+				break;
+			}
+			di++;
+		}
 
-        if (defaultfilesn[di] == NULL) {
-            merror("%s: WARN: Error opening directory: '%s': %s ",
-                   ARGV0, dir_name, strerror(errno));
-        }
+		if (defaultfilesn[di] == NULL) {
+			merror("%s: WARN: Error opening directory: '%s': %s ",
+			ARGV0, dir_name, strerror(errno));
+		}
 #else
-        merror("%s: WARN: Error opening directory: '%s': %s ",
-               ARGV0,
-               dir_name,
-               strerror(errno));
+		merror("%s: WARN: Error opening directory: '%s': %s ",
+		ARGV0,
+		dir_name,
+		strerror(errno));
 #endif /* WIN32 */
-        return (-1);
-    }
+		return (-1);
+	}
 
 	if(stat(dir_name, &statbuf) < 0)
 	{
@@ -250,7 +253,7 @@ static int read_dir(const char *dir_name, int opts, OSMatch *restriction)
 		return(-1);
 	}
 
-    /* Check for real time flag */
+	/* Check for real time flag */
 	record = OSHash_Get(syscheck.fp, dir_name);
 	if (!record)
 	{
@@ -264,8 +267,8 @@ static int read_dir(const char *dir_name, int opts, OSMatch *restriction)
 			opts & CHECK_OWNER?'+':'-',
 			opts & CHECK_GROUP?'+':'-',
 			opts & CHECK_PERM?(int)statbuf.st_mode:0,
-		opts & CHECK_OWNER?(int)statbuf.st_uid:0,
-		opts & CHECK_GROUP?(int)statbuf.st_gid:0);
+			opts & CHECK_OWNER?(int)statbuf.st_uid:0,
+			opts & CHECK_GROUP?(int)statbuf.st_gid:0);
 
 		if (OSHash_Add(syscheck.fp, strdup(dir_name), record) <= 0)
 		{
@@ -278,9 +281,9 @@ static int read_dir(const char *dir_name, int opts, OSMatch *restriction)
 		/* Checking for real time flag. */
 		if(opts & CHECK_REALTIME)
 		{
-#ifdef INOTIFY_ENABLED
-        realtime_adddir(dir_name);
-#endif
+			#ifdef INOTIFY_ENABLED
+			realtime_adddir(dir_name);
+			#endif
 		}
 	}
 	else
@@ -296,33 +299,33 @@ static int read_dir(const char *dir_name, int opts, OSMatch *restriction)
 			send_syscheck_msg(alert_msg);
 		}
 	}
-    while ((entry = readdir(dp)) != NULL) {
-        char *s_name;
+	while ((entry = readdir(dp)) != NULL) {
+		char *s_name;
 
-        /* Ignore . and ..  */
-        if ((strcmp(entry->d_name, ".") == 0) ||
-                (strcmp(entry->d_name, "..") == 0)) {
-            continue;
-        }
+		/* Ignore . and ..  */
+		if ((strcmp(entry->d_name, ".") == 0) ||
+		(strcmp(entry->d_name, "..") == 0)) {
+			continue;
+		}
 
-        strncpy(f_name, dir_name, PATH_MAX);
-        s_name =  f_name;
-        s_name += dir_size;
+		strncpy(f_name, dir_name, PATH_MAX);
+		s_name =  f_name;
+		s_name += dir_size;
 
-        /* Check if the file name is already null terminated */
-        if (*(s_name - 1) != '/') {
-            *s_name++ = '/';
-        }
+		/* Check if the file name is already null terminated */
+		if (*(s_name - 1) != '/') {
+			*s_name++ = '/';
+		}
 
-        *s_name = '\0';
-        strncpy(s_name, entry->d_name, PATH_MAX - dir_size - 2);
+		*s_name = '\0';
+		strncpy(s_name, entry->d_name, PATH_MAX - dir_size - 2);
 
-        /* Check integrity of the file */
-        read_file(f_name, opts, restriction);
-    }
+		/* Check integrity of the file */
+		read_file(f_name, opts, restriction);
+	}
 
-    closedir(dp);
-    return (0);
+	closedir(dp);
+	return (0);
 }
 
 int run_dbcheck()

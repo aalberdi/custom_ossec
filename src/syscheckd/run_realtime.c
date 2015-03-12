@@ -40,45 +40,45 @@ int realtime_checksumfile(const char *file_name) __attribute__((nonnull));
 /* Checksum of the realtime file being monitored */
 int realtime_checksumfile(const char *file_name)
 {
-    dbrecord *record;
+	dbrecord *record;
+	record = OSHash_Get(syscheck.fp, file_name);
 
-    record = OSHash_Get(syscheck.fp, file_name);
 	if(record != NULL) {
-        char c_sum[256 + 2];
+		char c_sum[256 + 2];
 
-        c_sum[0] = '\0';
-        c_sum[255] = '\0';
+		c_sum[0] = '\0';
+		c_sum[255] = '\0';
 
-        /* If it returns < 0, we have already alerted */
-        if (c_read_file(file_name, record->alert_msg, c_sum) < 0) {
-            return (0);
-        }
+		/* If it returns < 0, we have already alerted */
+		if (c_read_file(file_name, record->alert_msg, c_sum) < 0) {
+			return (0);
+		}
 
-        if (strcmp(c_sum, record->alert_msg + 6) != 0) {
-            char *fullalert = NULL;
-            char alert_msg[OS_MAXSTR + 1];
+		if (strcmp(c_sum, record->alert_msg + 6) != 0) {
+			char *fullalert = NULL;
+			char alert_msg[OS_MAXSTR + 1];
 
-            alert_msg[OS_MAXSTR] = '\0';
+			alert_msg[OS_MAXSTR] = '\0';
 
-            if (record->alert_msg[5] == 's' || record->alert_msg[5] == 'n') {
-                fullalert = seechanges_addfile(file_name);
-                if (fullalert) {
-                    snprintf(alert_msg, OS_MAXSTR, "%s %s\n%s", c_sum, file_name, fullalert);
-                    free(fullalert);
-                    fullalert = NULL;
-                } else {
-                    snprintf(alert_msg, 912, "%s %s", c_sum, file_name);
-                }
-            } else {
-                snprintf(alert_msg, 912, "%s %s", c_sum, file_name);
-            }
-            send_syscheck_msg(alert_msg);
+			if (record->alert_msg[5] == 's' || record->alert_msg[5] == 'n') {
+				fullalert = seechanges_addfile(file_name);
+				if (fullalert) {
+					snprintf(alert_msg, OS_MAXSTR, "%s %s\n%s", c_sum, file_name, fullalert);
+					free(fullalert);
+					fullalert = NULL;
+				} else {
+					snprintf(alert_msg, 912, "%s %s", c_sum, file_name);
+				}
+			} else {
+			snprintf(alert_msg, 912, "%s %s", c_sum, file_name);
+			}
+			send_syscheck_msg(alert_msg);
 
-            return (1);
-        }
-        return (0);
-    }
-    return (0);
+			return (1);
+		}
+		return (0);
+	}
+	return (0);
 }
 
 #ifdef INOTIFY_ENABLED
