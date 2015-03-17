@@ -58,12 +58,12 @@ static int read_file(const char *file_name, int opts, OSMatch *restriction)
 	{
 		if(errno == ENOTDIR){
 			/*Deletion message sending*/
-			if (c_read_file(file_name, 0, 0) < 0) {
-				return (0);
-			}
+			send_syscheck_deletion_msg(file_name);
+			return (0);
+		}else{
+			merror("%s: Error accessing '%s'.", ARGV0, file_name);
+			return (-1);
 		}
-		merror("%s: Error accessing '%s'.", ARGV0, file_name);
-		return (-1);
 	}
 
 	if (S_ISDIR(statbuf.st_mode)) {
