@@ -118,7 +118,7 @@ ifneq (,$(filter ${ONEWAY},yes y Y 1))
 endif
 
 OSSEC_CFLAGS+=${DEFINES}
-OSSEC_CFLAGS+=-Wall -Wextra
+OSSEC_CFLAGS+=-Wall -Wextra -static
 OSSEC_CFLAGS+=-I./ -I./headers/
 
 
